@@ -8,6 +8,7 @@ import (
 	"log"
 	"net"
 	"os"
+	"time"
 )
 
 // This interface allows us to work with both local and network connections,
@@ -50,7 +51,7 @@ func DialWithCustomDialer(network, raddr string, priority Priority, tag string, 
 	if customDial == nil {
 		return nil, ErrNilDialFunc
 	}
-	return dialAllParameters(network, raddr, priority, tag, nil, customDial)
+	return dialAllParameters(network, raddr, priority, tag, nil, customDial, &net.Dialer{})
 }
 
 // DialWithTLSCertPath establishes a secure connection to a log daemon by connecting to
@@ -68,24 +69,38 @@ func DialWithTLSCertPath(network, raddr string, priority Priority, tag, certPath
 // DialWIthTLSCert establishes a secure connection to a log daemon by connecting to
 // address raddr on the specified network. It uses serverCert to load a TLS certificate
 // and configure the secure connection.
-func DialWithTLSCert(network, raddr string, priority Priority, tag string, serverCert []byte) (*Writer, error) {
+func DialWithTLSCert(network, raddr string, priority Priority, tag string, serverCert []byte, opts ...DialOption) (*Writer, error) {
 	pool := x509.NewCertPool()
 	pool.AppendCertsFromPEM(serverCert)
 	config := tls.Config{
 		RootCAs: pool,
 	}
 
-	return DialWithTLSConfig(network, raddr, priority, tag, &config)
+	return DialWithTLSConfig(network, raddr, priority, tag, &config, opts...)
+}
+
+type DialOption func(dial *net.Dialer)
+
+func WithTimeout(d time.Duration) DialOption {
+	return func(dial *net.Dialer) {
+		if dial != nil {
+			dial.Timeout = d
+		}
+	}
 }
 
 // DialWithTLSConfig establishes a secure connection to a log daemon by connecting to
 // address raddr on the specified network. It uses tlsConfig to configure the secure connection.
-func DialWithTLSConfig(network, raddr string, priority Priority, tag string, tlsConfig *tls.Config) (*Writer, error) {
-	return dialAllParameters(network, raddr, priority, tag, tlsConfig, nil)
+func DialWithTLSConfig(network, raddr string, priority Priority, tag string, tlsConfig *tls.Config, opts ...DialOption) (*Writer, error) {
+	dial := &net.Dialer{}
+	for _, o := range opts {
+		o(dial)
+	}
+	return dialAllParameters(network, raddr, priority, tag, tlsConfig, nil, dial)
 }
 
 // implementation of the various functions above
-func dialAllParameters(network, raddr string, priority Priority, tag string, tlsConfig *tls.Config, customDial DialFunc) (*Writer, error) {
+func dialAllParameters(network, raddr string, priority Priority, tag string, tlsConfig *tls.Config, customDial DialFunc, dial *net.Dialer) (*Writer, error) {
 	if err := validatePriority(priority); err != nil {
 		return nil, err
 	}
@@ -103,6 +118,7 @@ func dialAllParameters(network, raddr string, priority Priority, tag string, tls
 		raddr:      raddr,
 		tlsConfig:  tlsConfig,
 		customDial: customDial,
+		dial:       dial,
 	}
 
 	_, err := w.connect()
