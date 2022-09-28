@@ -137,6 +137,17 @@ script/coverage --html
 
 That will open a new browser tab showing coverage information.
 
+# Contributions
+
+contributions are expected to include tests and tests must pass.  If existing tests start to fail due to
+expired certs simply run
+
+```
+openssl req -x509 -sha256 -nodes -newkey rsa:4096 -keyout test/privkey.pem -days 730 -out test/cert.pem -config test/san.cnf 
+```
+
+to generate new ones
+
 # License
 
 This project uses the New BSD License, the same as the Go project itself.
@@ -145,3 +156,5 @@ This project uses the New BSD License, the same as the Go project itself.
 
 Please note that this project is released with a Contributor Code of Conduct.
 By participating in this project you agree to abide by its terms.
+
+

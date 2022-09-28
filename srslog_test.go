@@ -263,10 +263,16 @@ func TestDial(t *testing.T) {
 		t.Skip("skipping syslog test during -short")
 	}
 	f, err := Dial("", "", (LOG_LOCAL7|LOG_DEBUG)+1, "syslog_test")
+	if err == nil {
+		t.Fatalf("Should have trapped bad priority")
+	}
 	if f != nil {
 		t.Fatalf("Should have trapped bad priority")
 	}
 	f, err = Dial("", "", -1, "syslog_test")
+	if err == nil {
+		t.Fatalf("Should have trapped bad priority")
+	}
 	if f != nil {
 		t.Fatalf("Should have trapped bad priority")
 	}
@@ -426,7 +432,7 @@ func TestTLSCertWrite(t *testing.T) {
 				t.Fatalf("cold not read cert: %v", err)
 			}
 
-			l, err := DialWithTLSCert("tcp+tls", addr, test.pri, test.pre, cert)
+			l, err := DialWithTLSCert("tcp+tls", addr, test.pri, test.pre, cert, WithTimeout(10*time.Second))
 			if err != nil {
 				t.Fatalf("syslog.Dial() failed: %v", err)
 			}
@@ -541,7 +547,10 @@ func TestLocalConn(t *testing.T) {
 
 	lc := localConn{conn: conn}
 
-	lc.writeString(nil, nil, LOG_ERR, "hostname", "tag", "content")
+	err := lc.writeString(nil, nil, LOG_ERR, "hostname", "tag", "content")
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
 
 	if len(messages) != 1 {
 		t.Errorf("should write one message")
